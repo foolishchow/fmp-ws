@@ -1,6 +1,6 @@
-fmp-ws
+# fmp-ws
 
-midway playground for websoket dependency on ws
+> midway playground for websoket dependency on ws
 
 # enable in config
 ```typescript
