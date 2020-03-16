@@ -1,0 +1,24 @@
+{
+  "name": "fmp-ws",
+  "version": "0.0.1",
+  "description": "foolishchow midway playground for websocket",
+  "main": "index.js",
+  "typings": "index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "watch": "tsc -w"
+  },
+  "author": "foolishchow",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^7.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "12.12.6",
+    "@types/ws": "^7.2.2",
+    "midway": "^1.18.0"
+  },
+  "eggPlugin": {
+    "name": "fmpws"
+  }
+}
