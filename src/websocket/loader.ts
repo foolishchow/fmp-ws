@@ -1,6 +1,6 @@
-import { Application, getClassMetadata, getPropertyDataFromClass, getProviderId, listModule, Middleware, RouterOption, RouterParamValue, WEB_ROUTER_KEY, WEB_ROUTER_PARAM_KEY } from "midway";
+import { Application, getClassMetadata, getPropertyDataFromClass, getProviderId, listModule, Middleware, RouterOption, RouterParamValue, WEB_ROUTER_KEY, WEB_ROUTER_PARAM_KEY, MiddlewareParamArray, WebMiddleware, KoaMiddleware } from "midway";
 import { WebSocketsOption, WEBSOCKETS_KEY } from "./decorators";
-import { wssOnApplication } from "./utils";
+import { registRouterToAoo } from "./utils";
 
 
 export class WebSocketLoader {
@@ -19,21 +19,56 @@ export class WebSocketLoader {
     }
   }
 
+  private handlerWebMiddleware(
+    middlewares: MiddlewareParamArray | void,
+    handlerCallback: (middlewareImpl: Middleware) => void,
+  ): void {
 
-  preRegisterRouter(module: any, providerId: string) {
+    if (middlewares && middlewares.length) {
+      for (const middleware of middlewares) {
+        if (typeof middleware === 'function') {
+          // web function middleware
+          handlerCallback(middleware);
+        } else {
+          const middlewareImpl: WebMiddleware = this.app.middleware
+            .filter(m => middleware == m._name)[0];
+          // const middlewareImpl: WebMiddleware | void = this.app.middlewares[middleware];
+          if (middlewareImpl && typeof middlewareImpl === 'function') {
+            handlerCallback(middlewareImpl);
+          }
+        }
+      }
+    }
+  }
+
+  async preRegisterRouter(module: any, providerId: string) {
     const controllerOption: WebSocketsOption = getClassMetadata(WEBSOCKETS_KEY, module);
     const webRouterInfo: RouterOption[] = getClassMetadata(WEB_ROUTER_KEY, module);
+
+    const middlewares: MiddlewareParamArray = controllerOption.routerOptions.middleware || [];
     if (webRouterInfo && typeof webRouterInfo[Symbol.iterator] === 'function') {
       for (const webRouter of webRouterInfo) {
         const routeArgsInfo = getPropertyDataFromClass(WEB_ROUTER_PARAM_KEY, module, webRouter.method) || [];
-        let websocket = this.generateController(`${providerId}.${webRouter.method}`, routeArgsInfo)
-        wssOnApplication(this.app as any, `${controllerOption.prefix}${webRouter.path}`, websocket)
+        const middlewares2: MiddlewareParamArray | void = webRouter.middleware;
+        let websocket = await this.generateController(`${providerId}.${webRouter.method}`, routeArgsInfo);
+        const currentMiddleWares: KoaMiddleware[] = [];
+        this.handlerWebMiddleware(middlewares, imp => currentMiddleWares.push(imp));
+        this.handlerWebMiddleware(middlewares2, imp => currentMiddleWares.push(imp));
+        registRouterToAoo(
+          this.app as any,
+          `${controllerOption.prefix}${webRouter.path}`,
+          websocket,
+          ...currentMiddleWares
+        );
       }
     }
   }
 
 
-  generateController(controllerMapping: string, routeArgsInfo?: RouterParamValue[]): Middleware {
+  async generateController(
+    controllerMapping: string,
+    routeArgsInfo: RouterParamValue[]
+  ): Promise<Middleware> {
     const [controllerId, methodName] = controllerMapping.split('.');
     return async (ctx, next) => {
       const args = [ctx, next];
